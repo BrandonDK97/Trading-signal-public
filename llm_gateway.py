@@ -91,7 +91,7 @@ Example 2 (Range Entry):
     try:
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",
             max_tokens=1024,
             messages=[
                 {"role": "user", "content": prompt}
