@@ -98,8 +98,13 @@ Example 2 (Range Entry):
             ]
         )
 
+        # Debug: Check why response might be truncated
+        print(f"DEBUG: Response stop_reason: {response.stop_reason}")
+        print(f"DEBUG: Response usage: {response.usage}")
+
         # Extract text from response
         response_text = response.content[0].text.strip()
+        print(f"DEBUG: Response text length: {len(response_text)} characters")
 
         # Remove markdown code fences if present
         if response_text.startswith('```'):
