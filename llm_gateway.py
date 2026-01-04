@@ -8,6 +8,9 @@ import os
 import json
 from anthropic import Anthropic
 from typing import Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def parse_trade_signal(message: str) -> Optional[Dict]:
@@ -91,7 +94,7 @@ Example 2 (Range Entry):
     try:
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-sonnet-20240620",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=2048,  # Increased to handle longer responses
             messages=[
                 {"role": "user", "content": prompt}
@@ -116,6 +119,19 @@ Example 2 (Range Entry):
             if lines and lines[-1].strip() == '```':
                 lines = lines[:-1]  # Remove last line
             response_text = '\n'.join(lines).strip()
+
+         # Remove markdown code fences if present
+        if response_text.startswith('```'):
+            # Remove opening code fence (```json or ```)
+            lines = response_text.split('\n')
+            if lines[0].startswith('```'):
+                lines = lines[1:]  # Remove first line
+            # Remove closing code fence
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]  # Remove last line
+            response_text = '\n'.join(lines).strip()
+
+        print("Claude response:" + response_text)
 
         # Parse JSON from response
         try:
@@ -164,23 +180,3 @@ Example 2 (Range Entry):
     except Exception as e:
         print(f"Error parsing trade signal: {e}")
         return None
-
-
-# Example usage
-if __name__ == "__main__":
-    # Test message
-    test_message = """👤 From: WG Bot
-
-💬 Message: @SpaghettiRavioli
-longed MON at 0.029529 sl: 0.02835 (0.5% risk)"""
-
-    print("Testing LLM Gateway...\n")
-    print(f"Input message:\n{test_message}\n")
-
-    result = parse_trade_signal(test_message)
-
-    if result:
-        print("✅ Parsed successfully!")
-        print(json.dumps(result, indent=2))
-    else:
-        print("❌ Failed to parse message")
