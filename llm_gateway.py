@@ -13,12 +13,14 @@ from typing import Dict, Optional
 def parse_trade_signal(message: str) -> Optional[Dict]:
     """
     Parse a natural language trade signal using Claude API.
+    Extracts both the telegram handle and trade information from the message.
 
     Args:
-        message: Raw message string containing trade information
+        message: Raw message string containing telegram handle and trade information
 
     Returns:
         Dictionary containing:
+            - telegram_handle: User's telegram handle (without @)
             - symbol: Trading symbol (e.g., "MON", "BTC")
             - direction: Trade direction ("long" or "short")
             - entry: Entry price
@@ -26,10 +28,11 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
             - risk_percent: Optional risk percentage if mentioned
 
     Example:
-        >>> message = "longed MON at 0.029529 sl: 0.02835 (0.5% risk)"
+        >>> message = "@SpaghettiRavioli longed MON at 0.029529 sl: 0.02835 (0.5% risk)"
         >>> result = parse_trade_signal(message)
         >>> print(result)
         {
+            'telegram_handle': 'SpaghettiRavioli',
             'symbol': 'MON',
             'direction': 'long',
             'entry': 0.029529,
@@ -44,12 +47,13 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
     client = Anthropic(api_key=api_key)
 
     # Construct prompt for Claude
-    prompt = f"""Parse the following trading signal message and extract the trade information.
+    prompt = f"""Parse the following trading signal message and extract the information.
 
 Message:
 {message}
 
 Please extract and return ONLY a JSON object with these fields:
+- telegram_handle: the telegram username (without @ symbol)
 - symbol: the trading pair/token symbol (uppercase)
 - direction: "long" or "short"
 - entry: entry price (as a number)
@@ -59,7 +63,7 @@ Please extract and return ONLY a JSON object with these fields:
 Return ONLY the JSON object, no other text or explanation.
 
 Example output format:
-{{"symbol": "BTC", "direction": "long", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}"""
+{{"telegram_handle": "SpaghettiRavioli", "symbol": "BTC", "direction": "long", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}"""
 
     try:
         # Call Claude API
@@ -78,10 +82,13 @@ Example output format:
         trade_data = json.loads(response_text)
 
         # Validate required fields
-        required_fields = ['symbol', 'direction', 'entry', 'stop_loss']
+        required_fields = ['telegram_handle', 'symbol', 'direction', 'entry', 'stop_loss']
         for field in required_fields:
             if field not in trade_data:
                 raise ValueError(f"Missing required field: {field}")
+
+        # Normalize telegram handle (remove @ if present)
+        trade_data['telegram_handle'] = trade_data['telegram_handle'].lstrip('@')
 
         # Normalize direction to lowercase
         trade_data['direction'] = trade_data['direction'].lower()

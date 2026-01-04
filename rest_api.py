@@ -11,6 +11,7 @@ import uvicorn
 
 from llm_gateway import parse_trade_signal
 from calculate_size import calculate_all_position_sizing_modes, calculate_take_profits
+from config import get_config_manager
 
 
 app = FastAPI(title="Trading Signal API", version="1.0.0")
@@ -18,9 +19,7 @@ app = FastAPI(title="Trading Signal API", version="1.0.0")
 
 class SignalRequest(BaseModel):
     """Request model for incoming trade signals"""
-    message: str
-    balance: Optional[float] = 10000  # Default balance
-    risk_tolerance: Optional[float] = 3  # Default risk %
+    message: str  # Contains telegram handle and trade data
 
 
 class SignalResponse(BaseModel):
@@ -46,9 +45,10 @@ async def health():
 async def process_signal(request: SignalRequest):
     """
     Process a trading signal message.
+    Extracts telegram handle from message and looks up user config from Firebase.
 
     Args:
-        request: SignalRequest containing the message and optional balance/risk settings
+        request: SignalRequest containing the raw message
 
     Returns:
         SignalResponse with parsed trade data, position sizing, and take profits
@@ -56,13 +56,11 @@ async def process_signal(request: SignalRequest):
     Example request:
         POST /signal
         {
-            "message": "longed MON at 0.029529 sl: 0.02835 (0.5% risk)",
-            "balance": 10000,
-            "risk_tolerance": 3
+            "message": "@SpaghettiRavioli longed MON at 0.029529 sl: 0.02835 (0.5% risk)"
         }
     """
     try:
-        # Step 1: Parse the message using LLM gateway
+        # Step 1: Parse the message using LLM gateway (extracts telegram_handle + trade data)
         trade_data = parse_trade_signal(request.message)
 
         if not trade_data:
@@ -71,28 +69,50 @@ async def process_signal(request: SignalRequest):
                 detail="Failed to parse trade signal from message"
             )
 
-        # Step 2: Calculate take profits
+        # Step 2: Get user configuration from Firebase
+        telegram_handle = trade_data['telegram_handle']
+        config_manager = get_config_manager()
+        user_config = config_manager.get_user_config(telegram_handle)
+
+        if not user_config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User @{telegram_handle} not found in database. Please register first."
+            )
+
+        # Extract user settings
+        balance = user_config['account_balance']
+        risk_tolerance = user_config['risk_appetite']
+
+        if balance <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User @{telegram_handle} has no account balance set"
+            )
+
+        # Step 3: Calculate take profits
         tps = calculate_take_profits(
             entry=trade_data['entry'],
             stop_loss=trade_data['stop_loss']
         )
 
-        # Step 3: Calculate position sizing for all modes
+        # Step 4: Calculate position sizing for all modes
         position_sizing = calculate_all_position_sizing_modes(
             entry=trade_data['entry'],
             stop_loss=trade_data['stop_loss'],
-            balance=request.balance,
-            user_risk_tolerance=request.risk_tolerance
+            balance=balance,
+            user_risk_tolerance=risk_tolerance
         )
 
-        # Step 4: Combine all data
+        # Step 5: Combine all data
         response_data = {
             "trade": trade_data,
             "take_profits": tps,
             "position_sizing": position_sizing,
-            "settings": {
-                "balance": request.balance,
-                "risk_tolerance": request.risk_tolerance
+            "user_settings": {
+                "telegram_handle": telegram_handle,
+                "balance": balance,
+                "risk_tolerance": risk_tolerance
             }
         }
 
