@@ -107,6 +107,10 @@ import os
 import json
 from typing import Dict, Optional, List
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 try:
     import firebase_admin
