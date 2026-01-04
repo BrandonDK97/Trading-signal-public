@@ -229,28 +229,35 @@ class BybitGateway:
             qty_per_entry = quantity / len(entry_prices)
             for i, entry_price in enumerate(entry_prices):
                 entry_order = {
-                    "order_id": f"MOCK_ENTRY_{i+1}_{datetime.utcnow().timestamp()}",
+                    # Mock order ID (real API would return this)
+                    "orderId": f"MOCK_ENTRY_{i+1}_{datetime.utcnow().timestamp()}",
+
+                    # Bybit API v5 format (camelCase)
+                    "category": "linear",  # linear, spot, inverse, option
                     "symbol": symbol,
-                    "side": side,
-                    "order_type": "Limit",
-                    "price": entry_price,
-                    "qty": round(qty_per_entry, 4),
-                    "time_in_force": "GTC",
-                    "reduce_only": False,
+                    "side": side,  # "Buy" or "Sell"
+                    "orderType": "Limit",  # Limit or Market
+                    "price": str(entry_price),  # Bybit expects string
+                    "qty": str(round(qty_per_entry, 4)),  # Bybit expects string
+                    "timeInForce": "GTC",  # GTC, IOC, FOK, PostOnly
+                    "reduceOnly": False,
+
+                    # Mock status
                     "status": "placed"
                 }
                 orders_placed.append(entry_order)
                 logger.info(f"  ✅ Entry Order {i+1}: {side} {entry_order['qty']} @ ${entry_price}")
 
-            # 2. Stop Loss Order
+            # 2. Stop Loss Order (using conditional order)
             sl_order = {
-                "order_id": f"MOCK_SL_{datetime.utcnow().timestamp()}",
+                "orderId": f"MOCK_SL_{datetime.utcnow().timestamp()}",
+                "category": "linear",
                 "symbol": symbol,
                 "side": "Sell" if side == "Buy" else "Buy",  # Opposite side
-                "order_type": "Market",  # SL triggers market order
-                "trigger_price": stop_loss,
-                "qty": quantity,
-                "reduce_only": True,
+                "orderType": "Market",  # SL triggers market order
+                "triggerPrice": str(stop_loss),  # Price that triggers the stop
+                "qty": str(quantity),
+                "reduceOnly": True,
                 "status": "placed"
             }
             orders_placed.append(sl_order)
@@ -263,13 +270,15 @@ class BybitGateway:
                 remaining_qty -= tp_qty
 
                 tp_order = {
-                    "order_id": f"MOCK_TP{i+1}_{datetime.utcnow().timestamp()}",
+                    "orderId": f"MOCK_TP{i+1}_{datetime.utcnow().timestamp()}",
+                    "category": "linear",
                     "symbol": symbol,
                     "side": "Sell" if side == "Buy" else "Buy",  # Opposite side
-                    "order_type": "Limit",
-                    "price": tp['price'],
-                    "qty": round(tp_qty, 4),
-                    "reduce_only": True,
+                    "orderType": "Limit",
+                    "price": str(tp['price']),
+                    "qty": str(round(tp_qty, 4)),
+                    "timeInForce": "GTC",
+                    "reduceOnly": True,
                     "status": "placed"
                 }
                 orders_placed.append(tp_order)
