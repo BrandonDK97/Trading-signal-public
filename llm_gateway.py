@@ -21,7 +21,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
 
     Returns:
         Dictionary containing:
-            - telegram_handle: User's telegram handle (without @)
+            - discord_handle: User's telegram handle (without @)
             - symbol: Trading symbol (e.g., "MON", "BTC")
             - direction: Trade direction ("long" or "short")
             - entry_type: "single" or "range"
@@ -35,7 +35,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
         >>> message = "@SpaghettiRavioli longed MON at 0.029529 sl: 0.02835"
         >>> result = parse_trade_signal(message)
         {
-            'telegram_handle': 'SpaghettiRavioli',
+            'discord_handle': 'SpaghettiRavioli',
             'symbol': 'MON',
             'direction': 'long',
             'entry_type': 'single',
@@ -47,7 +47,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
         >>> message = "Tradoor long 1.66 - 1.61 Sl: 1.57"
         >>> result = parse_trade_signal(message)
         {
-            'telegram_handle': 'Tradoor',
+            'discord_handle': 'Tradoor',
             'symbol': 'Tradoor',
             'direction': 'long',
             'entry_type': 'range',
@@ -70,7 +70,7 @@ Message:
 {message}
 
 Please extract and return ONLY a JSON object with these fields:
-- telegram_handle: the telegram username (without @ symbol, or use symbol name if no handle provided)
+- discord_handle: the telegram username (without @ symbol, or use symbol name if no handle provided)
 - symbol: the trading pair/token symbol (uppercase)
 - direction: "long" or "short"
 - entry_type: "single" if one price, or "range" if a price range (e.g., "1.66 - 1.61")
@@ -83,10 +83,10 @@ Please extract and return ONLY a JSON object with these fields:
 Return ONLY the JSON object, no other text or explanation.
 
 Example 1 (Single Entry):
-{{"telegram_handle": "SpaghettiRavioli", "symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
+{{"discord_handle": "SpaghettiRavioli", "symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
 
 Example 2 (Range Entry):
-{{"telegram_handle": "Tradoor", "symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
+{{"discord_handle": "Tradoor", "symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
 
     try:
         # Call Claude API
@@ -127,13 +127,13 @@ Example 2 (Range Entry):
             raise ValueError(f"Failed to parse JSON from Claude response: {e}\nResponse was: {response_text[:200]}")
 
         # Validate required fields
-        required_fields = ['telegram_handle', 'symbol', 'direction', 'entry', 'stop_loss']
+        required_fields = ['discord_handle', 'symbol', 'direction', 'entry', 'stop_loss']
         for field in required_fields:
             if field not in trade_data:
                 raise ValueError(f"Missing required field: {field}")
 
         # Normalize telegram handle (remove @ if present)
-        trade_data['telegram_handle'] = trade_data['telegram_handle'].lstrip('@')
+        trade_data['discord_handle'] = trade_data['discord_handle'].lstrip('@')
 
         # Normalize direction to lowercase
         trade_data['direction'] = trade_data['direction'].lower()
