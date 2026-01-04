@@ -8,6 +8,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from llm_gateway import parse_trade_signal
 from calculate_size import calculate_all_position_sizing_modes, calculate_take_profits
@@ -70,7 +74,7 @@ async def process_signal(request: SignalRequest):
             )
 
         # Extract signal sender (not used for calculation, just for logging)
-        signal_sender = trade_data['telegram_handle']
+        signal_sender = trade_data.get('discord_handle', 'unknown')
 
         # Step 2: Get leverage for this symbol from system config
         config_manager = get_config_manager()

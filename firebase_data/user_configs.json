@@ -1,0 +1,47 @@
+{
+  "john_trader": {
+    "telegram_handle": "john_trader",
+    "account_balance": 10000.0,
+    "risk_appetite": 3.0,
+    "bybit_api_key": null,
+    "bybit_api_secret": null,
+    "created_at": "2025-01-04T10:00:00Z",
+    "updated_at": "2025-01-04T10:00:00Z"
+  },
+  "alice_crypto": {
+    "telegram_handle": "alice_crypto",
+    "account_balance": 25000.0,
+    "risk_appetite": 2.0,
+    "bybit_api_key": null,
+    "bybit_api_secret": null,
+    "created_at": "2025-01-04T10:00:00Z",
+    "updated_at": "2025-01-04T10:00:00Z"
+  },
+  "bob_degen": {
+    "telegram_handle": "bob_degen",
+    "account_balance": 5000.0,
+    "risk_appetite": 5.0,
+    "bybit_api_key": null,
+    "bybit_api_secret": null,
+    "created_at": "2025-01-04T10:00:00Z",
+    "updated_at": "2025-01-04T10:00:00Z"
+  },
+  "test_whale": {
+    "telegram_handle": "test_whale",
+    "account_balance": 100000.0,
+    "risk_appetite": 2.5,
+    "bybit_api_key": null,
+    "bybit_api_secret": null,
+    "created_at": "2025-01-04T10:00:00Z",
+    "updated_at": "2025-01-04T10:00:00Z"
+  },
+  "conservative_trader": {
+    "telegram_handle": "conservative_trader",
+    "account_balance": 15000.0,
+    "risk_appetite": 1.0,
+    "bybit_api_key": null,
+    "bybit_api_secret": null,
+    "created_at": "2025-01-04T10:00:00Z",
+    "updated_at": "2025-01-04T10:00:00Z"
+  }
+}

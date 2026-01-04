@@ -24,7 +24,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
 
     Returns:
         Dictionary containing:
-            - telegram_handle: User's telegram handle (without @)
+            - discord_handle: User's telegram handle (without @)
             - symbol: Trading symbol (e.g., "MON", "BTC")
             - direction: Trade direction ("long" or "short")
             - entry_type: "single" or "range"
@@ -38,7 +38,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
         >>> message = "@SpaghettiRavioli longed MON at 0.029529 sl: 0.02835"
         >>> result = parse_trade_signal(message)
         {
-            'telegram_handle': 'SpaghettiRavioli',
+            'discord_handle': 'SpaghettiRavioli',
             'symbol': 'MON',
             'direction': 'long',
             'entry_type': 'single',
@@ -50,7 +50,7 @@ def parse_trade_signal(message: str) -> Optional[Dict]:
         >>> message = "Tradoor long 1.66 - 1.61 Sl: 1.57"
         >>> result = parse_trade_signal(message)
         {
-            'telegram_handle': 'Tradoor',
+            'discord_handle': 'Tradoor',
             'symbol': 'Tradoor',
             'direction': 'long',
             'entry_type': 'range',
@@ -73,6 +73,7 @@ Message:
 {message}
 
 Please extract and return ONLY a JSON object with these fields:
+- discord_handle: the telegram username (without @ symbol, or use symbol name if no handle provided)
 - symbol: the trading pair/token symbol (uppercase)
 - direction: "long" or "short"
 - entry_type: "single" if one price, or "range" if a price range (e.g., "1.66 - 1.61")
@@ -85,23 +86,39 @@ Please extract and return ONLY a JSON object with these fields:
 Return ONLY the JSON object, no other text or explanation.
 
 Example 1 (Single Entry):
-{{"symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
+{{"discord_handle": "SpaghettiRavioli", "symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
 
 Example 2 (Range Entry):
-{{"symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
+{{"discord_handle": "Tradoor", "symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
 
     try:
         # Call Claude API
         response = client.messages.create(
-             model="claude-sonnet-4-5-20250929",
-            max_tokens=10,
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2048,  # Increased to handle longer responses
             messages=[
                 {"role": "user", "content": prompt}
             ]
         )
 
+        # Debug: Check why response might be truncated
+        print(f"DEBUG: Response stop_reason: {response.stop_reason}")
+        print(f"DEBUG: Response usage: {response.usage}")
+
         # Extract text from response
         response_text = response.content[0].text.strip()
+        print(f"DEBUG: Response text length: {len(response_text)} characters")
+
+        # Remove markdown code fences if present
+        if response_text.startswith('```'):
+            # Remove opening code fence (```json or ```)
+            lines = response_text.split('\n')
+            if lines[0].startswith('```'):
+                lines = lines[1:]  # Remove first line
+            # Remove closing code fence
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]  # Remove last line
+            response_text = '\n'.join(lines).strip()
 
          # Remove markdown code fences if present
         if response_text.startswith('```'):
@@ -117,13 +134,22 @@ Example 2 (Range Entry):
         print("Claude response:" + response_text)
 
         # Parse JSON from response
-        trade_data = json.loads(response_text)
+        try:
+            trade_data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            # Show full response for debugging
+            print(f"Failed to parse JSON from Claude response: {e}")
+            print(f"Full response text:\n{response_text}")
+            raise ValueError(f"Failed to parse JSON from Claude response: {e}\nResponse was: {response_text[:200]}")
 
         # Validate required fields
-        required_fields = ['symbol', 'direction', 'entry', 'stop_loss']
+        required_fields = ['discord_handle', 'symbol', 'direction', 'entry', 'stop_loss']
         for field in required_fields:
             if field not in trade_data:
                 raise ValueError(f"Missing required field: {field}")
+
+        # Normalize telegram handle (remove @ if present)
+        trade_data['discord_handle'] = trade_data['discord_handle'].lstrip('@')
 
         # Normalize direction to lowercase
         trade_data['direction'] = trade_data['direction'].lower()
