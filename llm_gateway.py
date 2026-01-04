@@ -101,6 +101,17 @@ Example 2 (Range Entry):
         # Extract text from response
         response_text = response.content[0].text.strip()
 
+        # Remove markdown code fences if present
+        if response_text.startswith('```'):
+            # Remove opening code fence (```json or ```)
+            lines = response_text.split('\n')
+            if lines[0].startswith('```'):
+                lines = lines[1:]  # Remove first line
+            # Remove closing code fence
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]  # Remove last line
+            response_text = '\n'.join(lines).strip()
+
         # Parse JSON from response
         trade_data = json.loads(response_text)
 
