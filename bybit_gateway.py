@@ -94,6 +94,59 @@ class BybitGateway:
 
         raise NotImplementedError("Real API calls not implemented yet")
 
+    def set_leverage(self, symbol: str, leverage: int, category: str = "linear") -> Dict[str, Any]:
+        """
+        Set leverage for a trading symbol
+
+        Args:
+            symbol: Trading symbol (e.g., "BTCUSDT")
+            leverage: Leverage value (e.g., 10, 25, 100)
+            category: Product category (default: "linear")
+
+        Returns:
+            Dictionary containing API response
+
+        Real API Endpoint: POST /v5/position/set-leverage
+        Docs: https://bybit-exchange.github.io/docs/v5/position/leverage
+
+        IMPORTANT: Must be called BEFORE placing orders for this symbol.
+        Bybit applies leverage at the position level, not per order.
+
+        Example Request:
+        {
+            "category": "linear",
+            "symbol": "BTCUSDT",
+            "buyLeverage": "10",
+            "sellLeverage": "10"
+        }
+        """
+        if self.MOCK_MODE:
+            logger.info(f"⚙️  [MOCK] Setting leverage for {symbol} to {leverage}x...")
+
+            mock_response = {
+                "symbol": symbol,
+                "leverage": leverage,
+                "category": category,
+                "status": "success"
+            }
+
+            logger.info(f"✅ [MOCK] Leverage set: {symbol} = {leverage}x")
+            return mock_response
+
+        # TODO: Implement real API call
+        # url = f"{self.base_url}/v5/position/set-leverage"
+        # payload = {
+        #     "category": category,
+        #     "symbol": symbol,
+        #     "buyLeverage": str(leverage),
+        #     "sellLeverage": str(leverage)
+        # }
+        # headers = self._generate_signature(payload)
+        # response = requests.post(url, json=payload, headers=headers)
+        # return response.json()
+
+        raise NotImplementedError("Real API calls not implemented yet")
+
     def fetch_existing_limits(self, symbol: str) -> List[Dict[str, Any]]:
         """
         Fetch existing limit orders for a symbol (for idempotency)
@@ -155,6 +208,7 @@ class BybitGateway:
         entry_prices: List[float],
         stop_loss: float,
         take_profits: List[Dict[str, Any]],
+        leverage: int = 1,
         check_existing: bool = True
     ) -> Dict[str, Any]:
         """
@@ -163,7 +217,7 @@ class BybitGateway:
         Args:
             symbol: Trading symbol (e.g., "BTCUSDT")
             side: "Buy" or "Sell"
-            quantity: Total position size
+            quantity: Total position size (already calculated with leverage)
             entry_prices: List of entry prices for scaled orders (or single price)
             stop_loss: Stop loss price
             take_profits: List of take profit configs, e.g.:
@@ -171,6 +225,7 @@ class BybitGateway:
                     {"price": 51000, "qty_percent": 35},  # TP1: Close 35% at 51000
                     {"price": 52000, "qty_percent": 50}   # TP2: Close 50% at 52000
                 ]
+            leverage: Leverage to set for this symbol (default: 1)
             check_existing: Check for existing orders before placing (idempotency)
 
         Returns:
@@ -207,7 +262,12 @@ class BybitGateway:
             logger.info(f"📝 [MOCK] Placing Limit Orders for {symbol}")
             logger.info(f"{'='*60}")
 
-            # Check for existing orders (idempotency)
+            # Step 1: Set leverage for the symbol (must be done before placing orders)
+            if leverage > 1:
+                self.set_leverage(symbol, leverage)
+                logger.info(f"")
+
+            # Step 2: Check for existing orders (idempotency)
             if check_existing:
                 existing = self.fetch_existing_limits(symbol)
                 if existing:
@@ -217,6 +277,7 @@ class BybitGateway:
             # Log order details
             logger.info(f"Symbol: {symbol}")
             logger.info(f"Side: {side}")
+            logger.info(f"Leverage: {leverage}x")
             logger.info(f"Total Quantity: {quantity}")
             logger.info(f"Entry Prices: {entry_prices}")
             logger.info(f"Stop Loss: {stop_loss}")
@@ -225,7 +286,7 @@ class BybitGateway:
             # Calculate orders to place
             orders_placed = []
 
-            # 1. Entry Orders (scaled if multiple prices)
+            # 3. Entry Orders (scaled if multiple prices)
             qty_per_entry = quantity / len(entry_prices)
             for i, entry_price in enumerate(entry_prices):
                 entry_order = {
@@ -248,7 +309,7 @@ class BybitGateway:
                 orders_placed.append(entry_order)
                 logger.info(f"  ✅ Entry Order {i+1}: {side} {entry_order['qty']} @ ${entry_price}")
 
-            # 2. Stop Loss Order (using conditional order)
+            # 4. Stop Loss Order (using conditional order)
             sl_order = {
                 "orderId": f"MOCK_SL_{datetime.utcnow().timestamp()}",
                 "category": "linear",
@@ -263,7 +324,7 @@ class BybitGateway:
             orders_placed.append(sl_order)
             logger.info(f"  ✅ Stop Loss: Trigger @ ${stop_loss} (Market {sl_order['side']} {quantity})")
 
-            # 3. Take Profit Orders
+            # 5. Take Profit Orders
             remaining_qty = quantity
             for i, tp in enumerate(take_profits):
                 tp_qty = quantity * (tp['qty_percent'] / 100)
@@ -369,15 +430,16 @@ if __name__ == "__main__":
     existing = gateway.fetch_existing_limits("BTCUSDT")
     print()
 
-    # Example 3: Place limit orders with SL and multiple TPs
-    print("Example 3: Place Limit Orders (Single Entry)")
+    # Example 3: Place limit orders with SL and multiple TPs (with leverage)
+    print("Example 3: Place Limit Orders (Single Entry with 10x Leverage)")
     print("-" * 60)
     result = gateway.set_limit_orders(
         symbol="BTCUSDT",
         side="Buy",
-        quantity=0.1,
+        quantity=1.0,  # 10x more than without leverage (0.1 * 10)
         entry_prices=[50000],  # Single entry
         stop_loss=49000,
+        leverage=10,  # 10x leverage
         take_profits=[
             {"price": 50500, "qty_percent": 35},  # TP1: 35% at 50500
             {"price": 51250, "qty_percent": 50}   # TP2: 50% at 51250
@@ -385,15 +447,16 @@ if __name__ == "__main__":
     )
     print()
 
-    # Example 4: Place scaled entry orders
-    print("Example 4: Place Scaled Entry Orders (Range)")
+    # Example 4: Place scaled entry orders (with leverage)
+    print("Example 4: Place Scaled Entry Orders (Range with 25x Leverage)")
     print("-" * 60)
     result = gateway.set_limit_orders(
         symbol="ETHUSDT",
         side="Buy",
-        quantity=5.0,
+        quantity=125.0,  # 25x leveraged quantity (5.0 * 25)
         entry_prices=[3000, 2950, 2900],  # Scaled entries
         stop_loss=2850,
+        leverage=25,  # 25x leverage
         take_profits=[
             {"price": 3050, "qty_percent": 35},
             {"price": 3125, "qty_percent": 50}
