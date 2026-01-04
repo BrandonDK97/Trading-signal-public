@@ -89,7 +89,8 @@ def calculate_all_position_sizing_modes(
     entry: float,
     stop_loss: float,
     balance: float,
-    user_risk_tolerance: float
+    user_risk_tolerance: float,
+    leverage: int = 1
 ) -> Dict[str, Dict[str, float]]:
     """
     Calculate position sizing for all three risk modes.
@@ -99,6 +100,7 @@ def calculate_all_position_sizing_modes(
         stop_loss: Stop loss price
         balance: Account balance in USDT
         user_risk_tolerance: User's normal risk tolerance percentage (e.g., 3 for 3%)
+        leverage: Leverage multiplier (e.g., 10 for 10x, 100 for 100x). Default: 1 (no leverage)
 
     Returns:
         Dictionary containing position sizing for conservative, normal, and aggressive modes.
@@ -147,17 +149,24 @@ def calculate_all_position_sizing_modes(
         # Calculate risk per unit (percentage)
         risk_per_unit = price_difference / entry
 
-        # Calculate notional value (position size in USDT)
+        # Calculate notional value (position size in USDT without leverage)
         notional_value = max_loss / risk_per_unit
 
-        # Calculate quantity (number of coins/tokens)
-        quantity = notional_value / entry
+        # Apply leverage to calculate actual quantity
+        # With leverage, you can control a larger position with the same capital
+        # Example: 10x leverage allows you to buy 10x more quantity
+        quantity = (notional_value * leverage) / entry
+
+        # Margin required (capital needed for this leveraged position)
+        margin_required = notional_value / leverage if leverage > 1 else notional_value
 
         results[mode_name] = {
             'notional_value': round(notional_value, 2),
             'quantity': round(quantity, 4),
             'max_loss': round(max_loss, 2),
             'risk_percent': risk_percent,
+            'leverage': leverage,
+            'margin_required': round(margin_required, 2),
             'mode': mode_name
         }
 
@@ -168,7 +177,8 @@ def calculate_position_size(
     entry: float,
     stop_loss: float,
     balance: float,
-    risk_percent: float
+    risk_percent: float,
+    leverage: int = 1
 ) -> Dict[str, float]:
     """
     Calculate position sizing for a single risk percentage.
@@ -178,6 +188,7 @@ def calculate_position_size(
         stop_loss: Stop loss price
         balance: Account balance in USDT
         risk_percent: Risk tolerance percentage (e.g., 3 for 3%)
+        leverage: Leverage multiplier (e.g., 10 for 10x, 100 for 100x). Default: 1 (no leverage)
 
     Returns:
         Dictionary containing:
@@ -205,17 +216,22 @@ def calculate_position_size(
     # Calculate risk per unit (percentage)
     risk_per_unit = price_difference / entry
 
-    # Calculate notional value (position size in USDT)
+    # Calculate notional value (position size in USDT without leverage)
     notional_value = max_loss / risk_per_unit
 
-    # Calculate quantity (number of coins/tokens)
-    quantity = notional_value / entry
+    # Apply leverage to calculate actual quantity
+    quantity = (notional_value * leverage) / entry
+
+    # Margin required (capital needed for this leveraged position)
+    margin_required = notional_value / leverage if leverage > 1 else notional_value
 
     return {
         'notional_value': round(notional_value, 2),
         'quantity': round(quantity, 4),
         'max_loss': round(max_loss, 2),
-        'risk_percent': risk_percent
+        'risk_percent': risk_percent,
+        'leverage': leverage,
+        'margin_required': round(margin_required, 2)
     }
 
 

@@ -72,14 +72,18 @@ async def process_signal(request: SignalRequest):
         # Extract signal sender (not used for calculation, just for logging)
         signal_sender = trade_data['telegram_handle']
 
-        # Step 2: Calculate take profits (same for all users)
+        # Step 2: Get leverage for this symbol from system config
+        config_manager = get_config_manager()
+        symbol = trade_data['symbol']
+        leverage = config_manager.get_leverage_for_symbol(symbol)
+
+        # Step 3: Calculate take profits (same for all users)
         tps = calculate_take_profits(
             entry=trade_data['entry'],
             stop_loss=trade_data['stop_loss']
         )
 
-        # Step 3: Get ALL user configurations from Firebase
-        config_manager = get_config_manager()
+        # Step 4: Get ALL user configurations from Firebase
         all_users = config_manager.get_all_users()
 
         if not all_users:
@@ -88,7 +92,7 @@ async def process_signal(request: SignalRequest):
                 detail="No users found in database. Please register users first."
             )
 
-        # Step 4: Calculate position sizing for EACH user
+        # Step 5: Calculate position sizing for EACH user
         user_calculations = []
 
         for user_config in all_users:
@@ -105,12 +109,13 @@ async def process_signal(request: SignalRequest):
                 })
                 continue
 
-            # Calculate position sizing for this user
+            # Calculate position sizing for this user (with leverage)
             position_sizing = calculate_all_position_sizing_modes(
                 entry=trade_data['entry'],
                 stop_loss=trade_data['stop_loss'],
                 balance=balance,
-                user_risk_tolerance=risk_tolerance
+                user_risk_tolerance=risk_tolerance,
+                leverage=leverage
             )
 
             user_calculations.append({
@@ -121,14 +126,15 @@ async def process_signal(request: SignalRequest):
                 "position_sizing": position_sizing
             })
 
-        # Step 5: Combine all data
+        # Step 6: Combine all data
         response_data = {
             "signal_sender": signal_sender,
             "trade": {
                 "symbol": trade_data['symbol'],
                 "direction": trade_data['direction'],
                 "entry": trade_data['entry'],
-                "stop_loss": trade_data['stop_loss']
+                "stop_loss": trade_data['stop_loss'],
+                "leverage": leverage
             },
             "take_profits": tps,
             "users": user_calculations,
