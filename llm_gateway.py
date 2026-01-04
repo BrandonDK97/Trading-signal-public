@@ -73,7 +73,6 @@ Message:
 {message}
 
 Please extract and return ONLY a JSON object with these fields:
-- telegram_handle: the telegram username (without @ symbol, or use symbol name if no handle provided)
 - symbol: the trading pair/token symbol (uppercase)
 - direction: "long" or "short"
 - entry_type: "single" if one price, or "range" if a price range (e.g., "1.66 - 1.61")
@@ -86,16 +85,16 @@ Please extract and return ONLY a JSON object with these fields:
 Return ONLY the JSON object, no other text or explanation.
 
 Example 1 (Single Entry):
-{{"telegram_handle": "SpaghettiRavioli", "symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
+{{"symbol": "BTC", "direction": "long", "entry_type": "single", "entry": 50000, "stop_loss": 49000, "risk_percent": 1.0}}
 
 Example 2 (Range Entry):
-{{"telegram_handle": "Tradoor", "symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
+{{"symbol": "TRADOOR", "direction": "long", "entry_type": "range", "entry": 1.635, "entry_high": 1.66, "entry_low": 1.61, "stop_loss": 1.57, "risk_percent": null}}"""
 
     try:
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
+             model="claude-sonnet-4-5-20250929",
+            max_tokens=10,
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -104,17 +103,27 @@ Example 2 (Range Entry):
         # Extract text from response
         response_text = response.content[0].text.strip()
 
+         # Remove markdown code fences if present
+        if response_text.startswith('```'):
+            # Remove opening code fence (```json or ```)
+            lines = response_text.split('\n')
+            if lines[0].startswith('```'):
+                lines = lines[1:]  # Remove first line
+            # Remove closing code fence
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]  # Remove last line
+            response_text = '\n'.join(lines).strip()
+
+        print("Claude response:" + response_text)
+
         # Parse JSON from response
         trade_data = json.loads(response_text)
 
         # Validate required fields
-        required_fields = ['telegram_handle', 'symbol', 'direction', 'entry', 'stop_loss']
+        required_fields = ['symbol', 'direction', 'entry', 'stop_loss']
         for field in required_fields:
             if field not in trade_data:
                 raise ValueError(f"Missing required field: {field}")
-
-        # Normalize telegram handle (remove @ if present)
-        trade_data['telegram_handle'] = trade_data['telegram_handle'].lstrip('@')
 
         # Normalize direction to lowercase
         trade_data['direction'] = trade_data['direction'].lower()
@@ -145,23 +154,3 @@ Example 2 (Range Entry):
     except Exception as e:
         print(f"Error parsing trade signal: {e}")
         return None
-
-
-# Example usage
-if __name__ == "__main__":
-    # Test message
-    test_message = """👤 From: WG Bot
-
-💬 Message: @SpaghettiRavioli
-longed MON at 0.029529 sl: 0.02835 (0.5% risk)"""
-
-    print("Testing LLM Gateway...\n")
-    print(f"Input message:\n{test_message}\n")
-
-    result = parse_trade_signal(test_message)
-
-    if result:
-        print("✅ Parsed successfully!")
-        print(json.dumps(result, indent=2))
-    else:
-        print("❌ Failed to parse message")
