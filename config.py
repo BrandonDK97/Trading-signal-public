@@ -3,6 +3,104 @@ Configuration Manager with Firebase Integration
 
 Manages user configurations stored in Firebase Firestore.
 Stores: telegram_handle, account_balance, risk_appetite, and future bybit_api_key.
+
+TODO: SECURITY ENHANCEMENT - RSA Public/Private Key Authentication
+================================================================
+
+Current Status: ⚠️ No authentication required to fetch configs from Firebase
+Security Risk: Anyone with Firebase access can read all user configurations
+
+Proposed Implementation:
+------------------------
+
+1. RSA Key Pair Generation:
+   - Generate RSA public/private key pair
+   - Private key: Store securely on local system (environment variable or file)
+   - Public key: Store in Firebase Firestore (in separate 'api_keys' collection)
+
+2. Authentication Flow:
+   a) Client signs request with private key
+   b) Include signature in request header/payload
+   c) Server fetches public key from Firebase
+   d) Server verifies signature using public key
+   e) If valid, allow config fetch; otherwise, reject
+
+3. Implementation Steps:
+
+   Step 1: Key Generation & Storage
+   ---------------------------------
+   - Use cryptography library: `from cryptography.hazmat.primitives.asymmetric import rsa`
+   - Generate 2048-bit RSA key pair
+   - Store private key in .env as PEM format: FIREBASE_PRIVATE_KEY
+   - Store public key in Firebase collection:
+     {
+       "api_keys": {
+         "main_api": {
+           "public_key": "-----BEGIN PUBLIC KEY-----...",
+           "created_at": "2025-01-04",
+           "enabled": true
+         }
+       }
+     }
+
+   Step 2: Request Signing
+   -----------------------
+   - Create request payload: {"timestamp": <unix_time>, "action": "get_config"}
+   - Sign payload with private key using PKCS#1 v1.5 or PSS padding
+   - Include signature in API request
+
+   Step 3: Signature Verification
+   ------------------------------
+   - Add verify_signature() method to ConfigManager
+   - Fetch public key from Firebase
+   - Verify signature matches payload
+   - Check timestamp (prevent replay attacks - max 60 seconds old)
+
+   Step 4: Update All Methods
+   --------------------------
+   - Add signature parameter to: get_user_config(), get_all_users(), etc.
+   - Verify signature before allowing data access
+   - Return 401 Unauthorized if signature invalid
+
+4. Example Code Structure:
+
+   from cryptography.hazmat.primitives import hashes, serialization
+   from cryptography.hazmat.primitives.asymmetric import padding, rsa
+
+   class SecureConfigManager(ConfigManager):
+       def verify_signature(self, payload: str, signature: bytes) -> bool:
+           # Fetch public key from Firebase
+           # Verify signature
+           # Check timestamp
+           pass
+
+       def get_user_config(self, telegram_handle: str, signature: bytes, timestamp: int):
+           if not self.verify_signature(f"{telegram_handle}:{timestamp}", signature):
+               raise PermissionError("Invalid signature")
+           # ... existing logic
+
+5. Environment Variables Required:
+   FIREBASE_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----...
+   FIREBASE_KEY_ID=main_api
+
+6. Benefits:
+   ✅ Prevents unauthorized config access
+   ✅ No shared secrets (asymmetric encryption)
+   ✅ Public key can be safely stored in Firebase
+   ✅ Rotate keys without changing all clients (just update Firebase public key)
+   ✅ Can track which API key accessed what data
+
+7. Additional Considerations:
+   - Implement key rotation mechanism (monthly/quarterly)
+   - Add rate limiting per API key
+   - Log all access attempts with signature verification results
+   - Support multiple API keys for different services
+   - Add API key enable/disable toggle in Firebase
+
+Priority: HIGH (before production deployment)
+Estimated Effort: 4-6 hours
+Dependencies: cryptography library (pip install cryptography)
+
 """
 
 import os
