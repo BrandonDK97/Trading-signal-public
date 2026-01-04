@@ -8,6 +8,9 @@ import os
 import json
 from anthropic import Anthropic
 from typing import Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def parse_trade_signal(message: str) -> Optional[Dict]:

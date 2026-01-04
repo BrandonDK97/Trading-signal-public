@@ -107,6 +107,9 @@ import os
 import json
 from typing import Dict, Optional, List
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     import firebase_admin
