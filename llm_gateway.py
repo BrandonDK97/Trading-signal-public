@@ -92,7 +92,7 @@ Example 2 (Range Entry):
         # Call Claude API
         response = client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=1024,
+            max_tokens=2048,  # Increased to handle longer responses
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -113,7 +113,13 @@ Example 2 (Range Entry):
             response_text = '\n'.join(lines).strip()
 
         # Parse JSON from response
-        trade_data = json.loads(response_text)
+        try:
+            trade_data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            # Show full response for debugging
+            print(f"Failed to parse JSON from Claude response: {e}")
+            print(f"Full response text:\n{response_text}")
+            raise ValueError(f"Failed to parse JSON from Claude response: {e}\nResponse was: {response_text[:200]}")
 
         # Validate required fields
         required_fields = ['telegram_handle', 'symbol', 'direction', 'entry', 'stop_loss']
